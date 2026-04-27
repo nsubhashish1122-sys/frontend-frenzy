@@ -18,7 +18,86 @@
     --glass-border: rgba(0, 240, 255, 0.12);
     --text: #c8d8e8;
     --dim: #4a6070;
+    --canvas-clear: rgba(3,3,5,0.18);
+    --scanline: rgba(0,0,0,0.08);
+    --insight-head-color: #e0f0ff;
+    --card-shadow-a: rgba(0,240,255,.08);
+    --card-shadow-b: rgba(0,0,0,.5);
+    --card-hover-border: rgba(0,240,255,.22);
+    --mini-bar-bg: rgba(255,255,255,.06);
   }
+
+  /* ── LIGHT THEME ── */
+  html.light {
+    --bg: #f0f4fa;
+    --glass-bg: rgba(255,255,255,0.72);
+    --glass-border: rgba(0, 180, 210, 0.18);
+    --text: #1a2530;
+    --dim: #7a90a0;
+    --canvas-clear: rgba(240,244,250,0.22);
+    --scanline: rgba(0,0,0,0.025);
+    --insight-head-color: #0d1e2c;
+    --card-shadow-a: rgba(0,180,210,.06);
+    --card-shadow-b: rgba(80,120,160,.12);
+    --card-hover-border: rgba(0,180,210,.35);
+    --mini-bar-bg: rgba(0,0,0,.07);
+  }
+
+  /* ── THEME TOGGLE BUTTON ── */
+  #theme-toggle {
+    cursor: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 5px 14px 5px 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .15em;
+    color: var(--dim);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: border-color .3s, color .3s, background .3s;
+    white-space: nowrap;
+  }
+  #theme-toggle:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* The pill track */
+  #theme-toggle .toggle-track {
+    width: 34px; height: 18px;
+    background: rgba(0,240,255,.15);
+    border-radius: 999px;
+    border: 1px solid rgba(0,240,255,.3);
+    position: relative;
+    flex-shrink: 0;
+    transition: background .3s, border-color .3s;
+  }
+  html.light #theme-toggle .toggle-track {
+    background: rgba(0,140,180,.18);
+    border-color: rgba(0,140,180,.4);
+  }
+  /* The sliding thumb */
+  #theme-toggle .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    transition: left .3s cubic-bezier(.4,0,.2,1), background .3s, box-shadow .3s;
+  }
+  html.light #theme-toggle .toggle-thumb {
+    left: 18px;
+    background: #0099bb;
+    box-shadow: 0 0 8px #0099bb;
+  }
+  .toggle-icon { font-size: 13px; transition: opacity .3s; }
+  .toggle-icon.moon { opacity: 1; }
+  .toggle-icon.sun  { opacity: .4; }
+  html.light .toggle-icon.moon { opacity: .4; }
+  html.light .toggle-icon.sun  { opacity: 1; }
 
   html, body {
     width: 100%; min-height: 100vh;
@@ -27,6 +106,18 @@
     font-family: 'Rajdhani', sans-serif;
     overflow-x: hidden;
     cursor: none;
+    transition: background .4s, color .4s;
+  }
+
+  /* light theme: softer scanlines */
+  html.light body::after {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scanline) 2px,
+      var(--scanline) 4px
+    );
   }
 
   /* ── CURSOR ── */
@@ -142,17 +233,17 @@
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow:
-      inset 0 1px 0 rgba(0,240,255,.08),
-      0 4px 32px rgba(0,0,0,.5),
+      inset 0 1px 0 var(--card-shadow-a),
+      0 4px 32px var(--card-shadow-b),
       0 0 0 1px rgba(0,240,255,.04);
     padding: 24px;
-    transition: box-shadow .3s, border-color .3s;
+    transition: box-shadow .3s, border-color .3s, background .4s;
   }
   .card:hover {
-    border-color: rgba(0,240,255,.22);
+    border-color: var(--card-hover-border);
     box-shadow:
-      inset 0 1px 0 rgba(0,240,255,.12),
-      0 8px 48px rgba(0,0,0,.6),
+      inset 0 1px 0 var(--card-shadow-a),
+      0 8px 48px var(--card-shadow-b),
       0 0 24px rgba(0,240,255,.06);
   }
   .card-label {
@@ -218,7 +309,7 @@
     color: var(--dim);
   }
   .mini-bar-track {
-    flex: 1; height: 3px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden;
+    flex: 1; height: 3px; background: var(--mini-bar-bg); border-radius: 4px; overflow: hidden;
   }
   .mini-bar-fill { height: 100%; border-radius: 4px; transition: width 1.5s ease; }
 
@@ -262,7 +353,7 @@
   .bar-track {
     width: 100%;
     height: 8px;
-    background: rgba(255,255,255,.05);
+    background: var(--mini-bar-bg);
     border-radius: 8px;
     overflow: hidden;
     position: relative;
@@ -360,7 +451,7 @@
     font-family: 'Orbitron', sans-serif;
     font-size: 13px;
     font-weight: 700;
-    color: #e0f0ff;
+    color: var(--insight-head-color);
     margin-bottom: 6px;
     letter-spacing: .04em;
   }
@@ -414,6 +505,35 @@
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(0,240,255,.2); border-radius: 4px; }
+
+  /* ── LIGHT MODE OVERRIDES ── */
+  html.light .card-value {
+    text-shadow: 0 0 12px rgba(0,180,210,.25);
+  }
+  html.light .btn-rebalance {
+    color: #fff;
+  }
+  html.light .insight {
+    background: rgba(0,200,230,.06);
+  }
+  html.light .insight:hover {
+    background: rgba(0,200,230,.12);
+  }
+  html.light .insight.warn {
+    background: rgba(255,0,60,.05);
+  }
+  html.light .insight.warn:hover {
+    background: rgba(255,0,60,.10);
+  }
+  html.light .insight-action.cyan-action {
+    background: rgba(0,200,230,.10);
+  }
+  html.light .insight-action.red-action {
+    background: rgba(255,0,60,.08);
+  }
+  html.light ::-webkit-scrollbar-thumb {
+    background: rgba(0,140,180,.3);
+  }
 </style>
 </head>
 <body>
@@ -447,6 +567,12 @@
       <div><span class="status-dot"></span>SYSTEM ONLINE</div>
       <div id="live-clock">--:--:-- UTC</div>
       <div>SESSION &nbsp;#QN-<span id="session-id">----</span></div>
+      <button id="theme-toggle" title="Toggle theme" style="margin-top:8px">
+        <span class="toggle-icon moon">🌙</span>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="toggle-icon sun">☀️</span>
+        <span id="theme-label">DARK MODE</span>
+      </button>
     </div>
   </header>
 
@@ -626,7 +752,7 @@
     ring.style.left=rx+'px'; ring.style.top=ry+'px';
     requestAnimationFrame(animate);
   })();
-  const hovers = document.querySelectorAll('.card, .btn-rebalance, .insight');
+  const hovers = document.querySelectorAll('.card, .btn-rebalance, .insight, #theme-toggle');
   hovers.forEach(el=>{
     el.addEventListener('mouseenter',()=>document.body.classList.add('hovering'));
     el.addEventListener('mouseleave',()=>document.body.classList.remove('hovering'));
@@ -706,8 +832,9 @@
   }
 
   function loop(){
-    // motion blur
-    ctx.fillStyle='rgba(3,3,5,0.18)';
+    // motion blur — respect theme
+    const isDark = !document.documentElement.classList.contains('light');
+    ctx.fillStyle = isDark ? 'rgba(3,3,5,0.18)' : 'rgba(240,244,250,0.22)';
     ctx.fillRect(0,0,W,H);
     t+=0.008;
     nodes.forEach((n,i)=>drawNode(n,i,t));
@@ -771,6 +898,19 @@
         busy=false;
       },2000);
     },1500);
+  });
+})();
+/* ── THEME TOGGLE ── */
+(function(){
+  const btn   = document.getElementById('theme-toggle');
+  const label = document.getElementById('theme-label');
+  const html  = document.documentElement;
+  let isLight = false;
+
+  btn.addEventListener('click', () => {
+    isLight = !isLight;
+    html.classList.toggle('light', isLight);
+    label.textContent = isLight ? 'LIGHT MODE' : 'DARK MODE';
   });
 })();
 </script>
