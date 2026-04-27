@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quantum Neural Portfolio Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cyan: #00f0ff;
+    --purple: #b026ff;
+    --red: #ff003c;
+    --green: #00ff9d;
+    --bg: #030305;
+    --glass-bg: rgba(8, 14, 28, 0.65);
+    --glass-border: rgba(0, 240, 255, 0.12);
+    --text: #c8d8e8;
+    --dim: #4a6070;
+  }
+
+  html, body {
+    width: 100%; min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ── CURSOR ── */
+  #cur-dot {
+    position: fixed; top: 0; left: 0; z-index: 9999;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: background .15s;
+  }
+  #cur-ring {
+    position: fixed; top: 0; left: 0; z-index: 9998;
+    width: 36px; height: 36px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: width .25s, height .25s, border-color .25s, box-shadow .25s;
+  }
+  #cur-ring svg { width: 100%; height: 100%; }
+  body.hovering #cur-ring { width: 54px; height: 54px; }
+  body.hovering #cur-ring .ring-circle { stroke: var(--purple); filter: drop-shadow(0 0 6px var(--purple)); }
+  body.hovering #cur-dot { background: var(--purple); box-shadow: 0 0 10px var(--purple); }
+
+  /* ── CANVAS ── */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: -2;
+    width: 100%; height: 100%;
+  }
+
+  /* ── SCANLINES OVERLAY ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: -1;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* ── LAYOUT ── */
+  .shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 20px 48px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--glass-border);
+    position: relative;
+  }
+  header::after {
+    content: '';
+    position: absolute; bottom: -1px; left: 0;
+    width: 120px; height: 1px;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+  }
+  .logo-block .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(22px, 4vw, 38px);
+    font-weight: 900;
+    letter-spacing: .12em;
+    background: linear-gradient(90deg, var(--cyan) 0%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+  .logo-block .subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .header-meta {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    text-align: right;
+    line-height: 1.8;
+  }
+  .header-meta .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    margin-right: 6px;
+    animation: pulse-green 2s infinite;
+  }
+  @keyframes pulse-green {
+    0%,100% { opacity: 1; } 50% { opacity: .4; }
+  }
+
+  /* ── GLASS CARD ── */
+  .card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      inset 0 1px 0 rgba(0,240,255,.08),
+      0 4px 32px rgba(0,0,0,.5),
+      0 0 0 1px rgba(0,240,255,.04);
+    padding: 24px;
+    transition: box-shadow .3s, border-color .3s;
+  }
+  .card:hover {
+    border-color: rgba(0,240,255,.22);
+    box-shadow:
+      inset 0 1px 0 rgba(0,240,255,.12),
+      0 8px 48px rgba(0,0,0,.6),
+      0 0 24px rgba(0,240,255,.06);
+  }
+  .card-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .card-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(20px, 3vw, 30px);
+    font-weight: 700;
+    color: var(--cyan);
+    text-shadow: 0 0 20px rgba(0,240,255,.5);
+    letter-spacing: .06em;
+  }
+  .card-sub {
+    font-size: 12px;
+    color: var(--dim);
+    margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ── TOP STATS ROW ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  /* ── RISK GAUGE ── */
+  .risk-wrap {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .gauge-svg { flex-shrink: 0; }
+  .risk-detail .score-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 20px rgba(0,255,157,.5);
+    line-height: 1;
+  }
+  .risk-detail .score-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: .25em;
+    margin-top: 4px;
+  }
+  .risk-bars { margin-top: 10px; width: 100%; }
+  .mini-bar-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+  }
+  .mini-bar-track {
+    flex: 1; height: 3px; background: rgba(255,255,255,.06); border-radius: 4px; overflow: hidden;
+  }
+  .mini-bar-fill { height: 100%; border-radius: 4px; transition: width 1.5s ease; }
+
+  /* ── MAIN GRID ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 720px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* ── ALLOCATION BARS ── */
+  .alloc-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: var(--cyan);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .alloc-row { margin-bottom: 18px; }
+  .alloc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 7px;
+  }
+  .alloc-ticker {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .08em;
+  }
+  .alloc-pct {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+  }
+  .bar-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,.05);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    width: 0%;
+    transition: width 1.6s cubic-bezier(.4,0,.2,1);
+    position: relative;
+  }
+  .bar-fill::after {
+    content: '';
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 12px;
+    background: rgba(255,255,255,.35);
+    border-radius: 50%;
+    filter: blur(4px);
+  }
+  .bar-cyan   { background: linear-gradient(90deg, rgba(0,240,255,.3), var(--cyan)); box-shadow: 0 0 12px rgba(0,240,255,.4); }
+  .bar-purple { background: linear-gradient(90deg, rgba(176,38,255,.3), var(--purple)); box-shadow: 0 0 12px rgba(176,38,255,.4); }
+  .bar-red    { background: linear-gradient(90deg, rgba(255,0,60,.3), var(--red)); box-shadow: 0 0 12px rgba(255,0,60,.4); }
+  .bar-green  { background: linear-gradient(90deg, rgba(0,255,157,.3), var(--green)); box-shadow: 0 0 12px rgba(0,255,157,.4); }
+
+  /* ── REBALANCE BUTTON ── */
+  .btn-rebalance {
+    cursor: none;
+    margin-top: 24px;
+    width: 100%;
+    padding: 14px 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--bg);
+    background: linear-gradient(90deg, var(--cyan), #00a8b3);
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 0 24px rgba(0,240,255,.35), inset 0 1px 0 rgba(255,255,255,.15);
+    transition: background .4s, box-shadow .4s, color .4s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-rebalance::before {
+    content: '';
+    position: absolute; top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.15), transparent);
+    transition: left .5s;
+  }
+  .btn-rebalance:hover::before { left: 150%; }
+  .btn-rebalance.state-calc {
+    background: linear-gradient(90deg, var(--purple), #7a10cc);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(176,38,255,.45);
+  }
+  .btn-rebalance.state-done {
+    background: linear-gradient(90deg, var(--green), #009e60);
+    color: var(--bg);
+    box-shadow: 0 0 24px rgba(0,255,157,.45);
+  }
+
+  /* ── INSIGHTS ── */
+  .intel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: var(--cyan);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .insight {
+    border-left: 3px solid var(--cyan);
+    background: rgba(0,240,255,.04);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    transition: background .3s;
+  }
+  .insight:hover { background: rgba(0,240,255,.08); }
+  .insight.warn { border-left-color: var(--red); background: rgba(255,0,60,.04); }
+  .insight.warn:hover { background: rgba(255,0,60,.08); }
+  .insight-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .insight-tag.cyan { color: var(--cyan); }
+  .insight-tag.red  { color: var(--red); }
+  .insight-head {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e0f0ff;
+    margin-bottom: 6px;
+    letter-spacing: .04em;
+  }
+  .insight-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--dim);
+  }
+  .insight-action {
+    margin-top: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    letter-spacing: .15em;
+  }
+  .insight-action.cyan-action {
+    color: var(--cyan);
+    border: 1px solid rgba(0,240,255,.25);
+    background: rgba(0,240,255,.06);
+  }
+  .insight-action.red-action {
+    color: var(--red);
+    border: 1px solid rgba(255,0,60,.25);
+    background: rgba(255,0,60,.06);
+  }
+
+  /* ── BOTTOM ROW ── */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .metric-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    margin-top: 4px;
+  }
+  .metric-change {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  .up { color: var(--green); }
+  .dn { color: var(--red); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,240,255,.2); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div id="cur-dot"></div>
+<div id="cur-ring">
+  <svg viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- outer ring -->
+    <circle class="ring-circle" cx="27" cy="27" r="20" stroke="#00f0ff" stroke-width="1.2" opacity="0.8"/>
+    <!-- crosshair ticks -->
+    <line x1="27" y1="3"  x2="27" y2="10" stroke="#00f0ff" stroke-width="1.2" opacity="0.6"/>
+    <line x1="27" y1="44" x2="27" y2="51" stroke="#00f0ff" stroke-width="1.2" opacity="0.6"/>
+    <line x1="3"  y1="27" x2="10" y2="27" stroke="#00f0ff" stroke-width="1.2" opacity="0.6"/>
+    <line x1="44" y1="27" x2="51" y2="27" stroke="#00f0ff" stroke-width="1.2" opacity="0.6"/>
+  </svg>
+</div>
+
+<!-- BG Canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <div class="title">Neural Matrix</div>
+      <div class="subtitle">Quantum-Linked Asset Analyzer &nbsp;·&nbsp; v4.7.2</div>
+    </div>
+    <div class="header-meta">
+      <div><span class="status-dot"></span>SYSTEM ONLINE</div>
+      <div id="live-clock">--:--:-- UTC</div>
+      <div>SESSION &nbsp;#QN-<span id="session-id">----</span></div>
+    </div>
+  </header>
+
+  <!-- TOP STATS -->
+  <div class="stats-row">
+
+    <div class="card" id="liquidity-card">
+      <div class="card-label">Total System Liquidity</div>
+      <div class="card-value" id="liquidity-val">₹0.00</div>
+      <div class="card-sub">↑ 3.42% &nbsp;·&nbsp; LIVE SYNC ACTIVE</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Risk Engine Core</div>
+      <div class="risk-wrap">
+        <svg class="gauge-svg" viewBox="0 0 80 80" width="80" height="80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>
+          <circle id="gauge-arc" cx="40" cy="40" r="32" fill="none"
+            stroke="#00ff9d" stroke-width="7" stroke-linecap="round"
+            stroke-dasharray="201.06" stroke-dashoffset="201.06"
+            transform="rotate(-90 40 40)"
+            style="transition: stroke-dashoffset 2s ease; filter: drop-shadow(0 0 6px #00ff9d)"/>
+          <text x="40" y="45" text-anchor="middle"
+            font-family="Orbitron,sans-serif" font-size="16" font-weight="900"
+            fill="#00ff9d">92</text>
+        </svg>
+        <div class="risk-detail">
+          <div class="score-num">92<span style="font-size:16px;color:var(--dim)">/100</span></div>
+          <div class="score-label">RISK INDEX</div>
+          <div class="risk-bars">
+            <div class="mini-bar-row">
+              <span style="width:52px">VOLATIL</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill bar-cyan" data-w="72%" style="width:0"></div></div>
+              <span>72%</span>
+            </div>
+            <div class="mini-bar-row">
+              <span style="width:52px">EXPOSURE</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill bar-purple" data-w="58%" style="width:0"></div></div>
+              <span>58%</span>
+            </div>
+            <div class="mini-bar-row">
+              <span style="width:52px">HEDGE</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill bar-green" data-w="85%" style="width:0"></div></div>
+              <span>85%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT: ALLOCATIONS -->
+    <div class="card">
+      <div class="alloc-title">⬡ Capital Distribution</div>
+
+      <div class="alloc-row">
+        <div class="alloc-header">
+          <span class="alloc-ticker" style="color:var(--cyan)">AAPL</span>
+          <span class="alloc-pct">45% &nbsp;·&nbsp; ₹3,80,340</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-cyan" data-w="45%"></div></div>
+      </div>
+
+      <div class="alloc-row">
+        <div class="alloc-header">
+          <span class="alloc-ticker" style="color:var(--purple)">VOO</span>
+          <span class="alloc-pct">30% &nbsp;·&nbsp; ₹2,53,560</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-purple" data-w="30%"></div></div>
+      </div>
+
+      <div class="alloc-row">
+        <div class="alloc-header">
+          <span class="alloc-ticker" style="color:var(--red)">BTC</span>
+          <span class="alloc-pct">15% &nbsp;·&nbsp; ₹1,26,780</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-red" data-w="15%"></div></div>
+      </div>
+
+      <div class="alloc-row">
+        <div class="alloc-header">
+          <span class="alloc-ticker" style="color:var(--green)">ETH</span>
+          <span class="alloc-pct">10% &nbsp;·&nbsp; ₹84,520</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill bar-green" data-w="10%"></div></div>
+      </div>
+
+      <button class="btn-rebalance" id="rebalance-btn">⚡ Initialize Rebalance</button>
+    </div>
+
+    <!-- RIGHT: INSIGHTS -->
+    <div class="card">
+      <div class="intel-title">◈ Actionable Intelligence</div>
+
+      <div class="insight">
+        <div class="insight-tag cyan">↯ Volatility Signal · HIGH CONFIDENCE</div>
+        <div class="insight-head">Web3 Volatility Detected</div>
+        <div class="insight-body">
+          BTC + ETH combined exposure is generating cross-correlated drawdown risk. Momentum indicators show divergence from 30-day baseline.
+        </div>
+        <span class="insight-action cyan-action">▶ SET TRAILING STOP-LOSS @ -8%</span>
+      </div>
+
+      <div class="insight warn">
+        <div class="insight-tag red">⚠ Concentration Risk · MEDIUM</div>
+        <div class="insight-head">Tech Sector Saturation</div>
+        <div class="insight-body">
+          AAPL allocation at 45% breaches optimal Markowitz frontier threshold. Sharpe ratio degrades above 40% single-equity exposure.
+        </div>
+        <span class="insight-action red-action">▶ DIVERSIFY INTO BONDS / COMMODITIES</span>
+      </div>
+
+      <div class="insight" style="border-left-color:var(--purple); background:rgba(176,38,255,.04);">
+        <div class="insight-tag" style="color:var(--purple)">✦ Opportunity · SECTOR ROTATION</div>
+        <div class="insight-head">AI Infrastructure Uptick</div>
+        <div class="insight-body">
+          Data center & semiconductor sub-sectors are outperforming by 2.3σ. Consider partial reallocation from large-cap tech into SMID-cap semis.
+        </div>
+        <span class="insight-action" style="color:var(--purple);border:1px solid rgba(176,38,255,.25);background:rgba(176,38,255,.06)">▶ SCAN SEMI-CAP UNIVERSE</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM METRICS -->
+  <div class="bottom-row">
+    <div class="card">
+      <div class="card-label">30D Return</div>
+      <div class="metric-val up">+12.74%</div>
+      <div class="metric-change up">↑ Outperforms Nifty 50 by 4.2%</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sharpe Ratio</div>
+      <div class="metric-val" style="color:var(--cyan)">1.87</div>
+      <div class="metric-change" style="color:var(--dim)">BENCHMARK: 1.20</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Max Drawdown</div>
+      <div class="metric-val dn">-6.31%</div>
+      <div class="metric-change dn">↓ Within Risk Tolerance</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Neural Confidence</div>
+      <div class="metric-val" style="color:var(--purple)">96.4%</div>
+      <div class="metric-change" style="color:var(--dim)">MODEL EPOCH: 11,842</div>
+    </div>
+  </div>
+
+</div><!-- /shell -->
+
+<script>
+/* ── CLOCK & SESSION ── */
+(function(){
+  const el = document.getElementById('live-clock');
+  const sid = document.getElementById('session-id');
+  sid.textContent = Math.floor(Math.random()*9000+1000);
+  function tick(){
+    const d = new Date();
+    el.textContent = d.toUTCString().slice(17,25)+' UTC';
+  }
+  tick(); setInterval(tick,1000);
+})();
+
+/* ── CURSOR ── */
+(function(){
+  const dot  = document.getElementById('cur-dot');
+  const ring = document.getElementById('cur-ring');
+  let rx=0,ry=0, mx=0,my=0;
+  document.addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; dot.style.left=mx+'px'; dot.style.top=my+'px'; });
+  (function animate(){
+    rx += (mx-rx)*.12;
+    ry += (my-ry)*.12;
+    ring.style.left=rx+'px'; ring.style.top=ry+'px';
+    requestAnimationFrame(animate);
+  })();
+  const hovers = document.querySelectorAll('.card, .btn-rebalance, .insight');
+  hovers.forEach(el=>{
+    el.addEventListener('mouseenter',()=>document.body.classList.add('hovering'));
+    el.addEventListener('mouseleave',()=>document.body.classList.remove('hovering'));
+  });
+})();
+
+/* ── CANVAS BG – QUANTUM NODES ── */
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W,H;
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  resize(); window.addEventListener('resize',resize);
+
+  const nodes=[
+    { ax:0.7,ay:0.5,bx:1.3,by:0.9,cx:0.4,cy:1.1,dx:0.8,dy:0.6, px:0.5,py:0.5, color:'#00f0ff' },
+    { ax:1.1,ay:0.7,bx:0.9,by:1.2,cx:0.6,cy:0.8,dx:1.4,dy:0.5, px:0.5,py:0.5, color:'#b026ff' }
+  ];
+
+  let t=0;
+  const TRAIL_LEN=80;
+  const trails=[[],[]];
+
+  function drawNode(n,i,time){
+    const x = W/2 + Math.sin(n.ax*time+n.cx) * Math.cos(n.bx*time*0.7) * W*0.32;
+    const y = H/2 + Math.cos(n.ay*time+n.cy) * Math.sin(n.by*time*0.6) * H*0.28;
+    n.px=x; n.py=y;
+    trails[i].push({x,y});
+    if(trails[i].length>TRAIL_LEN) trails[i].shift();
+
+    // trail
+    for(let k=1;k<trails[i].length;k++){
+      const a=k/TRAIL_LEN;
+      ctx.beginPath();
+      ctx.moveTo(trails[i][k-1].x,trails[i][k-1].y);
+      ctx.lineTo(trails[i][k].x,trails[i][k].y);
+      ctx.strokeStyle=n.color;
+      ctx.globalAlpha=a*0.18;
+      ctx.lineWidth=1.2;
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+
+    // glow dot
+    const g=ctx.createRadialGradient(x,y,0,x,y,18);
+    g.addColorStop(0,n.color);
+    g.addColorStop(1,'transparent');
+    ctx.beginPath();
+    ctx.arc(x,y,18,0,Math.PI*2);
+    ctx.fillStyle=g;
+    ctx.globalAlpha=0.6;
+    ctx.fill();
+    ctx.globalAlpha=1;
+
+    // core dot
+    ctx.beginPath();
+    ctx.arc(x,y,3,0,Math.PI*2);
+    ctx.fillStyle=n.color;
+    ctx.shadowBlur=16; ctx.shadowColor=n.color;
+    ctx.fill();
+    ctx.shadowBlur=0;
+  }
+
+  function drawConnector(){
+    const x1=nodes[0].px, y1=nodes[0].py;
+    const x2=nodes[1].px, y2=nodes[1].py;
+    const g=ctx.createLinearGradient(x1,y1,x2,y2);
+    g.addColorStop(0,'#00f0ff');
+    g.addColorStop(1,'#b026ff');
+    ctx.beginPath();
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    ctx.strokeStyle=g;
+    ctx.globalAlpha=0.12;
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  function loop(){
+    // motion blur
+    ctx.fillStyle='rgba(3,3,5,0.18)';
+    ctx.fillRect(0,0,W,H);
+    t+=0.008;
+    nodes.forEach((n,i)=>drawNode(n,i,t));
+    drawConnector();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ── LIQUIDITY COUNT-UP ── */
+(function(){
+  const el = document.getElementById('liquidity-val');
+  const target = 845200.50;
+  const duration = 2200;
+  const start = performance.now();
+  function format(v){
+    return '₹'+v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function step(now){
+    const p=Math.min((now-start)/duration,1);
+    const ease=1-Math.pow(1-p,3);
+    el.textContent=format(ease*target);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
+
+/* ── GAUGE ARC ── */
+(function(){
+  const arc = document.getElementById('gauge-arc');
+  const circumference = 201.06;
+  const target = circumference*(1-92/100);
+  setTimeout(()=>{ arc.style.strokeDashoffset=target; },300);
+})();
+
+/* ── ALLOC BARS ── */
+(function(){
+  const fills = document.querySelectorAll('.bar-fill[data-w]');
+  const miniFills = document.querySelectorAll('.mini-bar-fill[data-w]');
+  setTimeout(()=>{
+    fills.forEach(f=>{ f.style.width=f.dataset.w; });
+    miniFills.forEach(f=>{ f.style.width=f.dataset.w; });
+  },400);
+})();
+
+/* ── REBALANCE BUTTON ── */
+(function(){
+  const btn = document.getElementById('rebalance-btn');
+  let busy=false;
+  btn.addEventListener('click',()=>{
+    if(busy) return;
+    busy=true;
+    btn.textContent='⟳ CALCULATING MATRIX...';
+    btn.className='btn-rebalance state-calc';
+    setTimeout(()=>{
+      btn.textContent='✔ REBALANCE EXECUTED';
+      btn.className='btn-rebalance state-done';
+      setTimeout(()=>{
+        btn.textContent='⚡ Initialize Rebalance';
+        btn.className='btn-rebalance';
+        busy=false;
+      },2000);
+    },1500);
+  });
+})();
+</script>
+</body>
+</html>
